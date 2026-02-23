@@ -488,3 +488,247 @@ Raw CSV  →  Structured relational table  →  Queryable healthcare dataset
 ```
 
 You've done what most students skip — loaded real data into a proper database before touching Python. This makes your analysis reproducible, scalable, and far more professional than notebook-only workflows.
+
+---
+
+# 📊 Week 2 — Professional SQL EDA
+
+This is where you stop being a student and start thinking like a healthcare analyst.
+
+---
+
+# 🎯 Objective of This Phase
+
+Before touching Python:
+
+We must answer:
+
+1. What does our target distribution look like?
+2. Is there class imbalance?
+3. Are there obvious data quality problems?
+4. Are there potential leakage variables?
+5. What early healthcare insights can we extract?
+
+Everything starts with SQL.
+
+---
+
+# 📁 Create: `sql/eda_queries.sql`
+
+Inside:
+
+```
+sql/eda_queries.sql
+```
+
+We’ll build this step by step.
+
+---
+
+# 🔎 1️⃣ Target Distribution (Critical)
+
+```sql
+SELECT 
+    readmitted,
+    COUNT(*) AS patient_count,
+    ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS percentage
+FROM admissions
+GROUP BY readmitted
+ORDER BY patient_count DESC;
+```
+
+---
+
+### 🧠 What You’re Checking
+
+Values should be:
+
+* NO
+* <30
+* > 30
+
+We care about `<30`.
+
+You will likely see:
+
+* NO ≈ 50–55%
+* > 30 ≈ 30–35%
+* <30 ≈ 10–12%
+
+This means:
+
+🚨 Severe class imbalance.
+
+Accuracy will be misleading.
+
+---
+
+# 🔍 2️⃣ Missing Value Inspection
+
+In this dataset, missing values are often stored as:
+
+```
+?
+```
+
+Check race:
+
+```sql
+SELECT race, COUNT(*)
+FROM admissions
+GROUP BY race
+ORDER BY COUNT(*) DESC;
+```
+
+You’ll see `?`.
+
+Now count missing values explicitly:
+
+```sql
+SELECT COUNT(*) 
+FROM admissions
+WHERE race = '?';
+```
+
+---
+
+### 🧠 Why This Matters
+
+In real healthcare systems:
+
+* Missing race can impact fairness analysis
+* Missing payer_code can impact billing interpretation
+
+We don’t drop blindly.
+
+---
+
+# 🔎 3️⃣ Length of Stay Distribution
+
+```sql
+SELECT 
+    time_in_hospital,
+    COUNT(*) AS count
+FROM admissions
+GROUP BY time_in_hospital
+ORDER BY time_in_hospital;
+```
+
+---
+
+### Think:
+
+* Does longer stay increase readmission risk?
+
+Test:
+
+```sql
+SELECT 
+    readmitted,
+    AVG(time_in_hospital) AS avg_stay
+FROM admissions
+GROUP BY readmitted;
+```
+
+---
+
+This is your first real analytical insight.
+
+---
+
+# 🔎 4️⃣ Previous Admissions (Strong Signal Candidate)
+
+```sql
+SELECT 
+    readmitted,
+    AVG(number_inpatient) AS avg_prior_inpatient
+FROM admissions
+GROUP BY readmitted;
+```
+
+If `<30` has higher prior admissions:
+
+That’s a powerful predictive feature.
+
+---
+
+# 🔎 5️⃣ Check for Duplicate Patients
+
+Very important.
+
+```sql
+SELECT 
+    patient_nbr,
+    COUNT(*) AS visit_count
+FROM admissions
+GROUP BY patient_nbr
+HAVING COUNT(*) > 1
+ORDER BY visit_count DESC;
+```
+
+This dataset has repeat patients.
+
+This creates a serious ML design question:
+
+👉 Should we split train/test by encounter or by patient?
+
+(We’ll handle this properly later.)
+
+---
+
+# 🔎 6️⃣ Inspect Discharge Disposition (Leakage Risk)
+
+```sql
+SELECT 
+    discharge_disposition_id,
+    COUNT(*)
+FROM admissions
+GROUP BY discharge_disposition_id
+ORDER BY COUNT(*) DESC;
+```
+
+Some discharge codes may imply:
+
+* Death
+* Transfer
+* Hospice
+
+If a patient died, they obviously won’t be readmitted.
+
+That can cause data leakage.
+
+We’ll handle that carefully later.
+
+---
+
+# 🧠 What You’re Learning Right Now
+
+You’re not:
+“running queries.”
+
+You’re:
+
+* Thinking causally
+* Thinking about bias
+* Thinking about leakage
+* Thinking about ML consequences
+
+This is professional-level thinking.
+
+---
+
+# 📌 Your Task Now
+
+Run:
+
+1. Target distribution query
+2. Average stay by readmission
+3. Average prior inpatient visits by readmission
+
+Then tell me:
+
+* What % is `<30`?
+* Is avg stay higher for `<30`?
+* Is number_inpatient higher for `<30`?
+
+
