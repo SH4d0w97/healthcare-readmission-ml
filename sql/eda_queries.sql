@@ -55,3 +55,62 @@ ORDER BY COUNT(*) DESC;
 SELECT COUNT(*) 
 FROM admissions
 WHERE race = '?';
+
+/
+
+-- Distribution of hospital stay duration (in days).
+-- Groups patients by number of days spent in hospital and counts occurrences.
+-- Ordered ascending to reveal the spread from shortest to longest stays.
+SELECT 
+    time_in_hospital,       -- Number of days the patient was hospitalized
+    COUNT(*) AS count       -- Number of admissions with that stay duration
+FROM admissions
+GROUP BY time_in_hospital
+ORDER BY time_in_hospital;  -- Sort by stay length for easy trend analysis
+
+/
+
+-- Analyze average hospital stay duration by readmission outcome.
+-- Helps identify whether readmitted patients tend to have longer or shorter
+-- initial stays, which may indicate premature discharge or inadequate care.
+SELECT 
+    readmitted,                              -- Readmission category (e.g., '<30', '>30', 'NO')
+    AVG(time_in_hospital) AS avg_stay        -- Mean number of days spent in hospital per group
+FROM admissions
+GROUP BY readmitted;
+
+/
+
+-- Compare prior inpatient visit history across readmission groups.
+-- Patients with more previous inpatient encounters may have chronic conditions
+-- that increase their risk of readmission, making this a key predictive signal.
+SELECT 
+    readmitted,                                        -- Readmission category (e.g., '<30', '>30', 'NO')
+    AVG(number_inpatient) AS avg_prior_inpatient       -- Mean number of inpatient visits in the year before this admission
+FROM admissions
+GROUP BY readmitted;
+
+/
+
+-- Identify patients with multiple admissions (repeat visitors).
+-- High visit counts may signal chronic or poorly managed conditions,
+-- and these patients are strong candidates for readmission prediction.
+SELECT 
+    patient_nbr,                    -- Unique patient identifier
+    COUNT(*) AS visit_count         -- Total number of admission records for this patient
+FROM admissions
+GROUP BY patient_nbr
+HAVING COUNT(*) > 1                 -- Retain only patients with more than one admission
+ORDER BY visit_count DESC;          -- Show most frequently admitted patients first
+
+/
+
+-- Examine the distribution of discharge dispositions across all admissions.
+-- Discharge destination (e.g., home, skilled nursing, expired) is strongly
+-- linked to patient severity and readmission risk, making it a valuable feature.
+SELECT 
+    discharge_disposition_id,      -- Coded discharge destination (maps to IDs defined by CMS/UCI dataset)
+    COUNT(*) AS admission_count    -- Number of admissions ending with this disposition
+FROM admissions
+GROUP BY discharge_disposition_id
+ORDER BY COUNT(*) DESC;            -- Most common discharge outcomes appear first
